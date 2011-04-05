@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <title>Re(a|commen)der</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+ <!-- <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0;"> -->
+
+   <script src="https://www.google.com/jsapi?key=ABQIAAAA9VqfzmSDpj0KeFqN4alMpxRJgdlsLkpb-m1pRkPcOn2VMw1pUhTS_zcAklrspu0uIfr9CHoNCu76-w" type="text/javascript"></script>
+    <script language="Javascript" type="text/javascript">
+    //<![CDATA[
+
+//TODO:
+//Color code "found" feeds differently
+//Add refresh button to find recommended feeds
+//Ask URL for recommended feeds
+//Timer to ask for new recommendations every n seconds
+//Content viewer to see article on side
+//Click on article to minimize item - "mark as read"
+//Have a class for feeds, feed read items, recommendation numbers, star counts
+	var defaultFeeds = 'http://rss.people.com/web/people/rss/topheadlines/index.xml;http://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml;http://www.tmz.com/rss.xml'; 
+	var feeds = [];
+
+    google.load("feeds", "1"); 
+    function removeFeed(feedURL) {
+    	for (var j = 0, k = feeds.length; j < k; j++) {
+			if (feeds[j] == feedURL) {
+				feeds.splice(j,1);
+				break;
+			}
+		}
+		saveSettings();
+    }
+    // Our callback function, for when a feed is loaded. 
+    function feedLoaded(result) { 
+      if (!result.error) {           
+        // Grab the container we will put the results into 
+        var container = document.getElementById("feedControl"); 
+        if (container.innerHTML == "Loading..."){container.innerHTML ='';} 
+
+        var div = document.createElement("div"); 
+
+		var spanminus = document.createElement("span");
+		spanminus.url = result.feed.feedUrl;
+		spanminus.appendChild(document.createTextNode("[X] "));
+		spanminus.style.cursor = 'pointer';
+        spanminus.setAttribute("class","feed-delete")
+        spanminus.setAttribute("className","feed-delete")
+		spanminus.onclick = function() {
+			removeFeed(this.url);
+			this.parentNode.parentNode.removeChild(this.parentNode);
+		}
+		div.appendChild(spanminus);
+
+        div.appendChild(document.createTextNode(result.feed.title+ " "));
+        div.setAttribute("class","feed-title")
+        div.setAttribute("className","feed-title")
+		
+		var divstars = document.createElement("span");
+        divstars.setAttribute("class","stars")
+        divstars.setAttribute("className","stars")
+        this.rating = parseInt(localStorage["rate-"+result.feed.feedUrl]);
+
+		for (var i = 1; i <= 5; i++) {
+			var divstar = document.createElement("span");
+			
+			divstar.appendChild(document.createTextNode((i <= this.rating) ? "★" : "☆"));
+	        divstar.rating = i;
+			
+			divstar.style.cursor = 'pointer';
+			divstar.onclick = function() {
+				for (var j = 0, k = this.parentNode.childNodes.length; j < k; j++) {
+					var s = this.parentNode.childNodes[j];
+					s.childNodes[0].data = (j < this.rating) ? "★" : "☆";
+				}
+
+				localStorage["rate-"+result.feed.feedUrl] = this.rating;
+				
+				var endpoint = document.getElementById("entry-endpoint").value;
+				var uid = document.getElementById("entry-userid").value;
+
+			    console.log("RECOMMEND to "+ endpoint + "/recommend/" + uid + "/" +result.feed.feedUrl + " RATING:"+ this.rating);
+			};
+			
+			divstar.onmouseover = function() {
+			    this.style.backgroundColor = 'red';
+			};
+			divstar.onmouseout = function() {
+			    this.style.backgroundColor = '';
+			};
+			divstars.appendChild(divstar);
+		}
+		div.appendChild(divstars);
+
+        // Loop through the feeds, putting the titles onto the page. 
+        for (var i = 0, l = result.feed.entries.length; i < l; i++) { 
+          var entry = result.feed.entries[i]; 
+          var diventry = document.createElement("div"); 
+          //(document.createTextNode(entry.title)); 
+
+	      var html = '<a href="' + entry.link + '">' + entry.title + '</a><br>' + entry.contentSnippet;
+          diventry.innerHTML = html;
+
+	      diventry.setAttribute("class","feed-result")
+	      diventry.setAttribute("className","feed-result")
+          div.appendChild(diventry); 
+        } 
+		container.appendChild(div); 
+      } 
+    } 
+    function OnLoad() { 
+      loadSettings();
+      saveSettings();
+      
+      // Create an array of your feeds. 
+      for (var i = 0, l = feeds.length; i < l; i++) { 
+      	var feed = new google.feeds.Feed(feeds[i]);
+        // Load all feeds in your feeds array, and specify a callback function. 
+      	feed.load(feedLoaded);   	
+      }
+    } 
+    google.setOnLoadCallback(OnLoad); 
+    
+    function feedSearch() {
+    	var searchbox = document.getElementById("entry-feeds");
+    	var searchtext = searchbox.value;
+
+		google.feeds.findFeeds(searchtext, findDone);
+    }
+    
+	function findDone(result) {
+	  // Make sure we didn't get an error.
+	  if (!result.error) {
+	
+	    for (var i = 0; i < result.entries.length; i++) {
+	      var feedentry = result.entries[i].url;
+	      feeds.push(feedentry);
+		  var feed = new google.feeds.Feed(feedentry);
+		  feed.load(feedLoaded);	      
+//	      html += '<p><a href="' + entry.url + '">' + entry.title + '</a></p>';
+	    }
+	  }
+	}
+    
+    function saveSettings() {
+		var endpoint = document.getElementById("entry-endpoint").value;
+		var uid = document.getElementById("entry-userid").value;
+
+    	localStorage.entryuserid = uid;
+    	localStorage.entryendpoint = endpoint;
+    	localStorage.feedlist = feeds.join(";");
+    	
+    }
+    function loadSettings() {
+		var endpoint = localStorage.entryendpoint ? localStorage.entryendpoint : "";
+		var uid = localStorage.entryuserid ? localStorage.entryuserid : guidGenerator();
+		feeds = localStorage.feedlist ? localStorage.feedlist : defaultFeeds;
+		feeds = feeds.split(";");
+
+    	document.getElementById("entry-userid").value = uid;
+    	document.getElementById("entry-endpoint").value = endpoint;    	
+    }
+	function guidGenerator() {
+	    var S4 = function() {
+	       return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
+	    };
+	    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
+	}
+    </script> 
+
+
+  <style type="text/css"> 
+    #feedControl { 
+      width : 700px; 
+      overflow: hidden; 
+      background-color: white; 
+      border: solid gold 2px; 
+    } 
+    div.feed-title { 
+      font: bold 14pt "Arial", sans-serif;
+      padding: 5px; 
+      background-color: gold;
+    } 
+    div.feed-resultsHeader { 
+      text-align: center; 
+      border: none; 
+    } 
+    div.feed-result { 
+      clear: both;
+      padding: 5px; 
+      border-top: dotted silver 1px;
+      -moz-border-radius: 15px;
+	  border-radius: 15px;
+    } 
+    div.feed-result:nth-child(odd)   { background-color:#FFFF99; }
+	div.feed-result:nth-child(even)  { background-color:#ffffff; }
+    dic.feed-results { 
+      margin-bottom: 3px; 
+      border-bottom: solid gold 1px; 
+    } 
+    .stars {
+    	color: #710909;
+    	font: bold 14pt "Tahoma";
+    }
+    span.feed-delete {
+    	color: red;
+    	font: bold 14pt "Tahoma";
+    }
+    input[type="text"] {
+    	width: 200px; 
+        background-color:#D2E0E6; 
+  }
+    input[type="search"] {
+    	width: 284px; 
+ }
+  </style> 
+
+</head>
+
+<body>
+
+  <div id="container">
+    <header>
+<input type="search" autofocus="autofocus" placeholder="Search Feeds" id="entry-feeds" onchange="feedSearch()">
+<input type="text" placeholder="UserID" id="entry-userid" onchange="saveSettings();">
+<input type="text" placeholder="Recommender URL" id="entry-endpoint" onchange="saveSettings();">
+    </header>
+    
+    <div id="main">
+	    <div id="feedControl">Loading...</div>
+    </div>
+    
+    <footer>
+
+    </footer>
+  </div> <!--! end of #container -->
+
+</html>
+
+</body>
+</html>
