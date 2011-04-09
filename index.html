@@ -51,6 +51,8 @@
         spanminus.setAttribute("className","feed-delete")
 		spanminus.onclick = function() {
 			removeFeed(this.url);
+			localStorage.removeItem("rate-"+this.url);
+
 			this.parentNode.parentNode.removeChild(this.parentNode);
 		}
 		div.appendChild(spanminus);
@@ -78,11 +80,8 @@
 				}
 
 				localStorage["rate-"+result.feed.feedUrl] = this.rating;
-				
-				var endpoint = document.getElementById("entry-endpoint").value;
-				var uid = document.getElementById("entry-userid").value;
 
-			    console.log("RECOMMEND to "+ endpoint + "/recommend/" + uid + "/" +result.feed.feedUrl + " RATING:"+ this.rating);
+				syncRecommendations();
 			};
 			
 			divstar.onmouseover = function() {
@@ -101,11 +100,17 @@
           var diventry = document.createElement("div"); 
           //(document.createTextNode(entry.title)); 
 
-	      var html = '<a href="' + entry.link + '">' + entry.title + '</a><br>' + entry.contentSnippet;
+	      var html = '<a href="' + entry.link + '">' + entry.title + '</a><br>';// + entry.contentSnippet;
           diventry.innerHTML = html;
 
 	      diventry.setAttribute("class","feed-result")
 	      diventry.setAttribute("className","feed-result")
+	      diventry.content = entry.content;
+	      
+	      diventry.onmouseover = function() {
+	      	document.getElementById("feedDetails").innerHTML = this.content;
+		  }
+
           div.appendChild(diventry); 
         } 
 		container.appendChild(div); 
@@ -148,20 +153,25 @@
     function saveSettings() {
 		var endpoint = document.getElementById("entry-endpoint").value;
 		var uid = document.getElementById("entry-userid").value;
+		var cutoff = document.getElementById("entry-cutoff").value;
 
     	localStorage.entryuserid = uid;
     	localStorage.entryendpoint = endpoint;
+    	localStorage.entrycutoff = cutoff;
     	localStorage.feedlist = feeds.join(";");
     	
     }
     function loadSettings() {
 		var endpoint = localStorage.entryendpoint ? localStorage.entryendpoint : "";
 		var uid = localStorage.entryuserid ? localStorage.entryuserid : guidGenerator();
+		var cutoff = localStorage.entrycutoff ? localStorage.entrycutoff : 10000;
 		feeds = localStorage.feedlist ? localStorage.feedlist : defaultFeeds;
 		feeds = feeds.split(";");
 
     	document.getElementById("entry-userid").value = uid;
-    	document.getElementById("entry-endpoint").value = endpoint;    	
+    	document.getElementById("entry-endpoint").value = endpoint;
+    	document.getElementById("entry-cutoff").value = cutoff;
+    		
     }
 	function guidGenerator() {
 	    var S4 = function() {
@@ -169,18 +179,51 @@
 	    };
 	    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
 	}
+	function syncRecommendations() {
+		var endpoint = document.getElementById("entry-endpoint").value;
+		var uid = document.getElementById("entry-userid").value;
+
+		console.log("RECOMMEND to "+ endpoint + " :");
+		strJSON = '{"ClientID":"'+uid+'", "Ratings":[';
+		for (var j = 0, k = feeds.length; j < k; j++) {
+			strJSON+=' {"Uri": "'+feeds[j]+'", "Score": '+ localStorage["rate-"+feeds[j]] + ', "Category": "rssfeed"}';
+			if (j < (feeds.length-1)) strJSON+=",";
+		}			    
+		strJSON+=']}';
+		console.log(strJSON);
+
+	}
     </script> 
 
 
   <style type="text/css"> 
+  	div.main {
+		width:1000px;
+		margin:0 auto;
+		background:#99c;
+	}  		
     #feedControl { 
-      width : 700px; 
+		float:left;
+		width:500px;
+		background:#9c9;
       overflow: hidden; 
       background-color: white; 
-      border: solid gold 2px; 
+      border: solid gold 2px;
     } 
+    #feedDetails {
+		background:#c9c;
+      overflow: scroll; 
+      background-color: white; 
+      padding: 5px;
+      border: solid gold 2px;
+      display: block;
+    }
+    #footer {
+    	clear:both;
+    	background:#cc9;
+    }
     div.feed-title { 
-      font: bold 14pt "Arial", sans-serif;
+      font: bold 13pt "Arial", sans-serif;
       padding: 5px; 
       background-color: gold;
     } 
@@ -189,17 +232,17 @@
       border: none; 
     } 
     div.feed-result { 
-      clear: both;
       padding: 5px; 
+      font: 11pt;
       border-top: dotted silver 1px;
       -moz-border-radius: 15px;
 	  border-radius: 15px;
     } 
     div.feed-result:nth-child(odd)   { background-color:#FFFF99; }
 	div.feed-result:nth-child(even)  { background-color:#ffffff; }
-    dic.feed-results { 
+    div.feed-results { 
       margin-bottom: 3px; 
-      border-bottom: solid gold 1px; 
+      border: solid gold 1px; 
     } 
     .stars {
     	color: #710909;
@@ -216,6 +259,11 @@
     input[type="search"] {
     	width: 284px; 
  }
+ 	#entry-loadrec {
+        background-color:#D2E0E6; 
+        font: bold;
+        cursor: pointer; 		
+ 	}
   </style> 
 
 </head>
@@ -226,17 +274,17 @@
     <header>
 <input type="search" autofocus="autofocus" placeholder="Search Feeds" id="entry-feeds" onchange="feedSearch()">
 <input type="text" placeholder="UserID" id="entry-userid" onchange="saveSettings();">
-<input type="text" placeholder="Recommender URL" id="entry-endpoint" onchange="saveSettings();">
+<input type="text" placeholder="Recommender URL Endpoint" id="entry-endpoint" onchange="saveSettings();">
+<input type="text" placeholder="Cutoff" id="entry-cutoff" onchange="saveSettings();">
+<span onclick="loadRecommendations()" id="entry-loadrec">GET RECOMENDATIONS</span>
     </header>
     
     <div id="main">
-	    <div id="feedControl">Loading...</div>
+	    <span id="feedControl">Loading...</span>
+	    <span id="feedDetails"></span>
     </div>
     
-    <footer>
-
-    </footer>
-  </div> <!--! end of #container -->
+  </div>
 
 </html>
 
