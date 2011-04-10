@@ -15,12 +15,10 @@
 
 //TODO:
 //Color code "found" feeds differently
-//Add refresh button to find recommended feeds
-//Ask URL for recommended feeds
 //Timer to ask for new recommendations every n seconds
-//Content viewer to see article on side
 //Click on article to minimize item - "mark as read"
 //Have a class for feeds, feed read items, recommendation numbers, star counts
+
 	var defaultFeeds = 'http://rss.people.com/web/people/rss/topheadlines/index.xml;http://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml;http://www.tmz.com/rss.xml'; 
 	var feeds = [];
 
@@ -142,10 +140,7 @@
 	
 	    for (var i = 0; i < result.entries.length; i++) {
 	      var feedentry = result.entries[i].url;
-	      feeds.push(feedentry);
-		  var feed = new google.feeds.Feed(feedentry);
-		  feed.load(feedLoaded);	      
-//	      html += '<p><a href="' + entry.url + '">' + entry.title + '</a></p>';
+	      feedLoad(feedentry);
 	    }
 	  }
 	}
@@ -179,9 +174,27 @@
 	    };
 	    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
 	}
+	function feedAlreadyLoaded(uri) {
+		var booExists = false;
+		for (var j = 0, k = feeds.length; j < k; j++) {
+			if (feeds[j] == uri) {
+				booExists = true;
+				break;
+			}
+		}
+		return booExists;
+	}
+	function feedLoad(uri) {
+		if (!feedAlreadyLoaded(uri)) {
+			feeds.push(uri);
+			var feed = new google.feeds.Feed(uri);
+			feed.load(feedLoaded);
+		}
+	}
 	function syncRecommendations() {
 		var endpoint = document.getElementById("entry-endpoint").value;
 		var uid = document.getElementById("entry-userid").value;
+		var cutoff = document.getElementById("entry-cutoff").value;
 
 		console.log("RECOMMEND to "+ endpoint + " :");
 		strJSON = '{"ClientID":"'+uid+'", "Ratings":[';
@@ -191,7 +204,55 @@
 		}			    
 		strJSON+=']}';
 		console.log(strJSON);
+		
+		var jsonpendpoint = endpoint + "?callback=JSONPCallback&result=" + encodeURIComponent(strJSON);
+		jsonp.fetch(jsonpendpoint, function(data) {
+			if (data.Recommendations && data.Recommendations.length > 0) {
+				for (var j = 0, k = data.Recommendations.length; j < k; j++) {
+					//console.log(data[0].text)
+					var rec = data.Recommendations[j];
+					if (rec.Category == "rssfeed") {
+						if (rec.Score > cutoff) {
+							var uri = unescape(rec.Uri);
+						    feedLoad(uri);
+					    }
+					}
+				}
+			}
+		});
 
+	}
+	
+	var jsonp = {
+		callbackCounter: 0,
+	
+		fetch: function(url, callback) {
+			var fn = 'JSONPCallback_' + this.callbackCounter++;
+			window[fn] = this.evalJSONP(callback);
+			url = url.replace('=JSONPCallback', '=' + fn);
+	
+			var scriptTag = document.createElement('script');
+			scriptTag.src = url;
+			document.getElementsByTagName('head')[0].appendChild(scriptTag);
+		},
+	
+		evalJSONP: function(callback) {
+			return function(data) {
+				var validJSON = false;
+			if (typeof data == "string") {
+				try {validJSON = JSON.parse(data);} catch (e) {
+					/*invalid JSON*/}
+			} else {
+				validJSON = JSON.parse(JSON.stringify(data));
+					window.console && console.warn('response data was not a JSON string');
+				}
+				if (validJSON) {
+					callback(validJSON);
+				} else {
+					throw("JSONP call returned invalid or empty JSON");
+				}
+			}
+		}
 	}
     </script> 
 
@@ -257,7 +318,7 @@
         background-color:#D2E0E6; 
   }
     input[type="search"] {
-    	width: 284px; 
+    	width: 184px; 
  }
  	#entry-loadrec {
         background-color:#D2E0E6; 
@@ -275,8 +336,8 @@
 <input type="search" autofocus="autofocus" placeholder="Search Feeds" id="entry-feeds" onchange="feedSearch()">
 <input type="text" placeholder="UserID" id="entry-userid" onchange="saveSettings();">
 <input type="text" placeholder="Recommender URL Endpoint" id="entry-endpoint" onchange="saveSettings();">
-<input type="text" placeholder="Cutoff" id="entry-cutoff" onchange="saveSettings();">
-<span onclick="loadRecommendations()" id="entry-loadrec">GET RECOMENDATIONS</span>
+<input type="text" placeholder="Cutoff" id="entry-cutoff" onchange="saveSettings();" style="width: 100px;">
+<span onclick="syncRecommendations()" id="entry-loadrec">GET RECOMENDATIONS</span>
     </header>
     
     <div id="main">
