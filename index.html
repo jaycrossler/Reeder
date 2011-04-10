@@ -15,12 +15,14 @@
 
 //TODO:
 //Color code "found" feeds differently
-//Timer to ask for new recommendations every n seconds
 //Click on article to minimize item - "mark as read"
 //Have a class for feeds, feed read items, recommendation numbers, star counts
 
 	var defaultFeeds = 'http://rss.people.com/web/people/rss/topheadlines/index.xml;http://www.eonline.com/syndication/feeds/rssfeeds/topstories.xml;http://www.tmz.com/rss.xml'; 
 	var feeds = [];
+	var blockedfeeds = [];
+	var timerRefresh;
+	var timerRefreshRate = 60000;
 
     google.load("feeds", "1"); 
     function removeFeed(feedURL) {
@@ -30,6 +32,7 @@
 				break;
 			}
 		}
+		blockedfeeds.push(feedURL);
 		saveSettings();
     }
     // Our callback function, for when a feed is loaded. 
@@ -117,6 +120,7 @@
     function OnLoad() { 
       loadSettings();
       saveSettings();
+      timerRefresh=setTimeout("syncRecommendations()",timerRefreshRate);
       
       // Create an array of your feeds. 
       for (var i = 0, l = feeds.length; i < l; i++) { 
@@ -140,7 +144,7 @@
 	
 	    for (var i = 0; i < result.entries.length; i++) {
 	      var feedentry = result.entries[i].url;
-	      feedLoad(feedentry);
+	      feedLoad(feedentry,true);
 	    }
 	  }
 	}
@@ -154,6 +158,8 @@
     	localStorage.entryendpoint = endpoint;
     	localStorage.entrycutoff = cutoff;
     	localStorage.feedlist = feeds.join(";");
+    	localStorage.blockedfeedlist = blockedfeeds.join(";");
+    	
     	
     }
     function loadSettings() {
@@ -162,6 +168,8 @@
 		var cutoff = localStorage.entrycutoff ? localStorage.entrycutoff : 10000;
 		feeds = localStorage.feedlist ? localStorage.feedlist : defaultFeeds;
 		feeds = feeds.split(";");
+		blockedfeeds = localStorage.blockedfeedlist ? localStorage.blockedfeedlist : "";
+		blockedfeeds = blockedfeeds.split(";");
 
     	document.getElementById("entry-userid").value = uid;
     	document.getElementById("entry-endpoint").value = endpoint;
@@ -174,7 +182,7 @@
 	    };
 	    return (S4()+S4()+"-"+S4()+"-"+S4()+"-"+S4()+"-"+S4()+S4()+S4());
 	}
-	function feedAlreadyLoaded(uri) {
+	function feedAlreadyLoaded(uri, allowBlocked) {
 		var booExists = false;
 		for (var j = 0, k = feeds.length; j < k; j++) {
 			if (feeds[j] == uri) {
@@ -182,10 +190,20 @@
 				break;
 			}
 		}
+		//Also make sure it wasn't previously blocked
+		if (!allowBlocked) {
+			for (var j = 0, k = blockedfeeds.length; j < k; j++) {
+				if (blockedfeeds[j] == uri) {
+					booExists = true;
+					break;
+				}
+			}
+		}
+
 		return booExists;
 	}
-	function feedLoad(uri) {
-		if (!feedAlreadyLoaded(uri)) {
+	function feedLoad(uri, allowBlocked) {
+		if (!feedAlreadyLoaded(uri, allowBlocked)) {
 			feeds.push(uri);
 			var feed = new google.feeds.Feed(uri);
 			feed.load(feedLoaded);
@@ -195,6 +213,10 @@
 		var endpoint = document.getElementById("entry-endpoint").value;
 		var uid = document.getElementById("entry-userid").value;
 		var cutoff = document.getElementById("entry-cutoff").value;
+
+		clearTimeout(timerRefresh);
+	    timerRefresh=setTimeout("syncRecommendations()",timerRefreshRate);  // Try again in X seconds
+
 
 		console.log("RECOMMEND to "+ endpoint + " :");
 		strJSON = '{"ClientID":"'+uid+'", "Ratings":[';
