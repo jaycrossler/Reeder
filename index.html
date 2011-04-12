@@ -246,12 +246,12 @@
 			if (data.Recommendations && data.Recommendations.length > 0) {
 				for (var j = 0, k = data.Recommendations.length; j < k; j++) {
 					var rec = data.Recommendations[j];
-					if (rec.Category && rec.Category == "rssfeed") { //If a category tag exists, check it.  TODO: Update for tages
+//					if (rec.Category && rec.Category == "rssfeed") { //If a category tag exists, check it.  TODO: Update for tages
 						if (rec.Confidence > cutoff) {
 							var uri = unescape(rec.Uri);
 						    feedLoad(uri);
 					    }
-					}
+//					}
 				}
 			}
 		});
