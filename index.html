@@ -213,7 +213,8 @@
 		var endpoint = document.getElementById("entry-endpoint").value;
 		var uid = document.getElementById("entry-userid").value;
 		var cutoff = document.getElementById("entry-cutoff").value;
-
+		endpoint += "/recommender/"+uid;
+		
 		clearTimeout(timerRefresh);
 	    timerRefresh=setTimeout("syncRecommendations()",timerRefreshRate);  // Try again in X seconds
 
@@ -225,16 +226,28 @@
 			if (j < (feeds.length-1)) strJSON+=",";
 		}			    
 		strJSON+=']}';
-		console.log(strJSON);
-		
-		var jsonpendpoint = endpoint + "?callback=JSONPCallback&result=" + encodeURIComponent(strJSON);
+
+//Check if Put works across servers
+		var xmlHttp = new XMLHttpRequest(); //returns a XMLHttpRequest object  
+    	xmlHttp.open('PUT', endpoint, true);  // true : asynchrous
+	    xmlHttp.setRequestHeader('Content-Type', "text/plain");    
+	    xmlHttp.send(strJSON);   
+
+		getRecommendations();
+	}
+	
+	function getRecommendations() {
+		var uid = document.getElementById("entry-userid").value;
+
+		var jsonpendpoint = endpoint + "/recommender/" + uid + "/recommendations?callback=JSONPCallback";
+		console.log(jsonpendpoint);
+
 		jsonp.fetch(jsonpendpoint, function(data) {
 			if (data.Recommendations && data.Recommendations.length > 0) {
 				for (var j = 0, k = data.Recommendations.length; j < k; j++) {
-					//console.log(data[0].text)
 					var rec = data.Recommendations[j];
-					if (rec.Category == "rssfeed") {
-						if (rec.Score > cutoff) {
+					if (rec.Category && rec.Category == "rssfeed") { //If a category tag exists, check it.  TODO: Update for tages
+						if (rec.Confidence > cutoff) {
 							var uri = unescape(rec.Uri);
 						    feedLoad(uri);
 					    }
@@ -242,7 +255,6 @@
 				}
 			}
 		});
-
 	}
 	
 	var jsonp = {
